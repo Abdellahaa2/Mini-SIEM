@@ -64,6 +64,3 @@ foreach ($Event in $NetEvents) {
 }
 
 Write-DebugLog "Mini-SIEM check completed."
-    }
-}
-Write-DebugLog "Mini-SIEM check completed."
