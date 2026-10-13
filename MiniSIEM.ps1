@@ -1,4 +1,4 @@
-# Mini-SIEM for Windows (XML Bulletproof Version)
+# Mini-SIEM for Windows (Final Version)
 
 $Desktop   = [Environment]::GetFolderPath("Desktop")
 $AlertFile = Join-Path $Desktop "SOC_Alerts.txt"
@@ -30,19 +30,18 @@ if ($FailedLogins) {
 }
 
 # --- 2. Suspicious Process Creation (Sysmon Event ID 1) ---
-# Increased to 100 events so we don't miss anything!
 $ProcEvents = Get-WinEvent -FilterHashtable @{LogName='Microsoft-Windows-Sysmon/Operational'; ID=1} -MaxEvents 100 -ErrorAction SilentlyContinue
 foreach ($Event in $ProcEvents) {
     [xml]$xml = $Event.ToXml()
     $Image       = ($xml.Event.EventData.Data | Where-Object { $_.Name -eq 'Image' }).'#text'
     $CommandLine = ($xml.Event.EventData.Data | Where-Object { $_.Name -eq 'CommandLine' }).'#text'
     
- # Ignore our own script (prevents false positives from the scheduled task)
-if ($CommandLine -match "MiniSIEM.ps1") { continue }
+    # Ignore our own script
+    if ($CommandLine -match "MiniSIEM.ps1") { continue }
 
-if ($Image -match "powershell.exe" -and $CommandLine -match "Invoke-WebRequest|IEX|DownloadString|EncodedCommand|bypass") {
-    Write-Alert "SUSPICIOUS POWERSHELL: $CommandLine"
-}
+    if ($Image -match "powershell.exe" -and $CommandLine -match "Invoke-WebRequest|IEX|DownloadString|EncodedCommand|bypass") {
+        Write-Alert "SUSPICIOUS POWERSHELL: $CommandLine"
+    }
     if ($Image -match "cmd.exe" -and $CommandLine -match "net user|whoami|ipconfig|net localgroup") {
         Write-Alert "SUSPICIOUS CMD: $CommandLine"
     }
@@ -55,15 +54,16 @@ foreach ($Event in $NetEvents) {
     $DestIP   = ($xml.Event.EventData.Data | Where-Object { $_.Name -eq 'DestinationIp' }).'#text'
     $DestPort = ($xml.Event.EventData.Data | Where-Object { $_.Name -eq 'DestinationPort' }).'#text'
     
-    # Ignore our own script (prevents false positives from the scheduled task)
-    if ($CommandLine -match "MiniSIEM.ps1") { continue }
-    
     # Ignore local multicast traffic (mDNS, SSDP, etc.)
     if ($DestIP -match "^ff02:" -or $DestIP -match "^224\.0\.0") { continue }
     
     # Ignore benign common ports
-    if ($DestPort -and $DestPort -notin @(80,443,53,22,3389,8080,5353,1900,5353)) {
+    if ($DestPort -and $DestPort -notin @(80,443,53,22,3389,8080,5353,1900)) {
         Write-Alert "UNUSUAL PORT CONNECTION: $DestIP on port $DestPort"
+    }
+}
+
+Write-DebugLog "Mini-SIEM check completed."
     }
 }
 Write-DebugLog "Mini-SIEM check completed."
