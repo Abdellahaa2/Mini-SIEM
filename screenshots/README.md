@@ -6,7 +6,7 @@ Screenshots for the Mini-SIEM project
 ![SOC Alert Popup](screenshots/alert-popup.png)
 
  Alert Log File
-![SOC Alerts Log](screenshots/soc-alerts-log.png)
+![SOC Alert Popup](/screenshots/soc-alerts-log.png)
 
  Automation Debug Log
 ![SOC Debug Log](screenshots/soc-debug-log.png)
