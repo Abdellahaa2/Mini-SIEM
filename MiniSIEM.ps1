@@ -1,4 +1,4 @@
-# Mini-SIEM for Windows (v2.0 - With Severity Levels)
+# Mini-SIEM for Windows (v3.0 - With HTML Dashboard)
 
 $Desktop   = [Environment]::GetFolderPath("Desktop")
 $AlertFile = Join-Path $Desktop "SOC_Alerts.txt"
@@ -28,6 +28,92 @@ function Write-DebugLog {
     param($Message)
     $Time = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
     Add-Content -Path $LogFile -Value "[$Time] $Message"
+}
+
+function Generate-Dashboard {
+    param($AlertFilePath, $OutputHtmlPath)
+    
+    if (-not (Test-Path $AlertFilePath)) { return }
+    
+    $lines = Get-Content $AlertFilePath -ErrorAction SilentlyContinue
+    $critical = ($lines | Select-String "\[CRITICAL\]").Count
+    $high     = ($lines | Select-String "\[HIGH\]").Count
+    $medium   = ($lines | Select-String "\[MEDIUM\]").Count
+    $low      = ($lines | Select-String "\[LOW\]").Count
+    $total    = $lines.Count
+    
+    $html = @"
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="refresh" content="30">
+<title>Mini-SIEM Dashboard</title>
+<style>
+    * { box-sizing: border-box; }
+    body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #0d1117; color: #c9d1d9; margin: 0; padding: 30px; }
+    h1 { color: #58a6ff; border-bottom: 2px solid #30363d; padding-bottom: 15px; margin-top: 0; }
+    .subtitle { color: #8b949e; margin-top: -10px; margin-bottom: 30px; font-size: 14px; }
+    .cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 30px; }
+    .card { padding: 25px 20px; border-radius: 10px; text-align: center; }
+    .card h2 { font-size: 48px; margin: 0; }
+    .card p { margin: 8px 0 0 0; font-size: 13px; text-transform: uppercase; letter-spacing: 2px; }
+    .critical { background: #58151c; color: #ff7b72; border: 1px solid #f85149; }
+    .high     { background: #5a1e02; color: #ffa657; border: 1px solid #db6d28; }
+    .medium   { background: #4d3800; color: #e3b341; border: 1px solid #d29922; }
+    .low      { background: #0d2847; color: #79c0ff; border: 1px solid #388bfd; }
+    .total-bar { background: #161b22; border: 1px solid #30363d; padding: 15px; border-radius: 8px; margin-bottom: 20px; text-align: center; color: #8b949e; }
+    .total-bar strong { color: #58a6ff; font-size: 20px; }
+    table { width: 100%; border-collapse: collapse; background: #161b22; border-radius: 10px; overflow: hidden; }
+    th { background: #21262d; color: #58a6ff; padding: 14px; text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; }
+    td { padding: 12px 14px; border-top: 1px solid #30363d; font-family: 'Consolas', monospace; font-size: 13px; }
+    tr:hover { background: #1c2128; }
+    .tag-critical { color: #ff7b72; font-weight: bold; }
+    .tag-high     { color: #ffa657; font-weight: bold; }
+    .tag-medium   { color: #e3b341; font-weight: bold; }
+    .tag-low      { color: #79c0ff; font-weight: bold; }
+    .footer { text-align: center; color: #8b949e; margin-top: 30px; font-size: 12px; }
+</style>
+</head>
+<body>
+    <h1>🛡️ Mini-SIEM Dashboard</h1>
+    <p class="subtitle">Auto-refreshes every 30 seconds &nbsp;|&nbsp; Last updated: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')</p>
+    
+    <div class="cards">
+        <div class="card critical"><h2>$critical</h2><p>Critical</p></div>
+        <div class="card high"><h2>$high</h2><p>High</p></div>
+        <div class="card medium"><h2>$medium</h2><p>Medium</p></div>
+        <div class="card low"><h2>$low</h2><p>Low</p></div>
+    </div>
+    
+    <div class="total-bar">Total alerts logged: <strong>$total</strong></div>
+    
+    <table>
+        <thead>
+            <tr><th style="width: 180px;">Timestamp</th><th style="width: 100px;">Severity</th><th>Alert Details</th></tr>
+        </thead>
+        <tbody>
+"@
+
+    foreach ($line in $lines) {
+        if ($line -match "^\[(.*?)\] \[(.*?)\] (.*)$") {
+            $time = $matches[1]
+            $sev = $matches[2]
+            $msg = $matches[3]
+            $cls = "tag-" + $sev.ToLower()
+            $html += "<tr><td>$time</td><td class='$cls'>$sev</td><td>$msg</td></tr>`n"
+        }
+    }
+
+    $html += @"
+        </tbody>
+    </table>
+    <div class="footer">Mini-SIEM v3.0 &nbsp;|&nbsp; Built with PowerShell &nbsp;|&nbsp; $(Get-Date -Format 'yyyy')</div>
+</body>
+</html>
+"@
+
+    $html | Out-File -FilePath $OutputHtmlPath -Encoding UTF8
 }
 
 Write-DebugLog "Mini-SIEM check started."
@@ -81,3 +167,7 @@ foreach ($Event in $NetEvents) {
 }
 
 Write-DebugLog "Mini-SIEM check completed."
+
+# --- 4. Generate HTML Dashboard ---
+$DashboardFile = Join-Path $Desktop "dashboard.html"
+Generate-Dashboard -AlertFilePath $AlertFile -OutputHtmlPath $DashboardFile
