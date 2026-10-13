@@ -208,3 +208,5 @@ Write-DebugLog "Mini-SIEM check completed."
 # --- 4. Generate HTML Dashboard ---
 $DashboardFile = Join-Path $Desktop "index.html"
 Generate-Dashboard -AlertFilePath $AlertFile -OutputHtmlPath $DashboardFile
+
+v4.1 - Strengthen network whitelist to reduce false positives
