@@ -1,4 +1,8 @@
-# Mini-SIEM for Windows (v3.0 - With HTML Dashboard)
+# Load API key from config file
+$ConfigPath = Join-Path $PSScriptRoot "config.ps1"
+if (Test-Path $ConfigPath) { . $ConfigPath }
+
+# Mini-SIEM for Windows
 
 $Desktop   = [Environment]::GetFolderPath("Desktop")
 $AlertFile = Join-Path $Desktop "SOC_Alerts.txt"
@@ -151,6 +155,37 @@ foreach ($Event in $ProcEvents) {
     }
 }
 
+# --- VirusTotal IP Lookup ---
+$script:VTCache = @{}
+
+function Get-VirusTotalReputation {
+    param([string]$IPAddress)
+    
+    if (-not $VT_API_KEY) { return "VT: no API key" }
+    if ($script:VTCache.ContainsKey($IPAddress)) { return $script:VTCache[$IPAddress] }
+    
+    $url = "https://www.virustotal.com/api/v3/ip_addresses/$IPAddress"
+    $headers = @{ "x-apikey" = $VT_API_KEY }
+    
+    try {
+        $response = Invoke-RestMethod -Uri $url -Headers $headers -Method Get -ErrorAction Stop
+        Start-Sleep -Seconds 16   # Respect free tier: 4 requests/minute
+        
+        $stats = $response.data.attributes.last_analysis_stats
+        $malicious = $stats.malicious
+        $suspicious = $stats.suspicious
+        $total = $stats.harmless + $stats.malicious + $stats.suspicious + $stats.undetected
+        
+        $result = "VT: $malicious malicious / $suspicious suspicious / $total engines"
+        $script:VTCache[$IPAddress] = $result
+        return $result
+    }
+    catch {
+        $script:VTCache[$IPAddress] = "VT: lookup failed"
+        return "VT: lookup failed"
+    }
+}
+
 # --- 3. Unusual Network Connections (Sysmon Event ID 3) ---
 $NetEvents = Get-WinEvent -FilterHashtable @{LogName='Microsoft-Windows-Sysmon/Operational'; ID=3} -MaxEvents 100 -ErrorAction SilentlyContinue
 foreach ($Event in $NetEvents) {
@@ -161,13 +196,15 @@ foreach ($Event in $NetEvents) {
     if ($DestIP -match "^ff02:" -or $DestIP -match "^224\.0\.0") { continue }
     if ($DestIP -match "^192\.168\." -or $DestIP -match "^10\.") { continue }
     
-    if ($DestPort -and $DestPort -notin @(80,443,53,22,3389,8080,5353,1900)) {
-        Write-Alert "Unusual port connection: $DestIP on port $DestPort" -Severity "MEDIUM"
+   if ($DestPort -eq "443" -or $DestPort -eq "80" -or $DestPort -eq "53" -or $DestPort -eq "22") { continue }
+if ($DestPort -and $DestPort -notin @(3389,8080,5353,1900)) {
+        $vtResult = Get-VirusTotalReputation -IPAddress $DestIP
+        Write-Alert "Unusual port connection: $DestIP on port $DestPort | $vtResult" -Severity "MEDIUM"
     }
 }
 
 Write-DebugLog "Mini-SIEM check completed."
 
 # --- 4. Generate HTML Dashboard ---
-$DashboardFile = Join-Path $Desktop "dashboard.html"
+$DashboardFile = Join-Path $Desktop "index.html"
 Generate-Dashboard -AlertFilePath $AlertFile -OutputHtmlPath $DashboardFile
