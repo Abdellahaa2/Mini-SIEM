@@ -2,7 +2,8 @@
 
 A lightweight Security Information and Event Management (SIEM) tool that monitors Windows Security and Sysmon logs for suspicious activity in real-time.
 
-![SOC Alert Popup](screenshots/alert-popup.png)
+![SOC Alert Popup](<img width="472" height="191" alt="Capture d&#39;écran 2026-10-13 110846" src="https://github.com/user-attachments/assets/d19ab2a2-d46e-4078-ba38-00657942973d" />
+)
 
 - What It Does
 
