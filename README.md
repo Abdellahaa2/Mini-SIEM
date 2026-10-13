@@ -24,3 +24,7 @@ A lightweight Security Information and Event Management (SIEM) tool that monitor
 ## 🌐 View Live Dashboard 
 
 https://abdellahaa2.github.io/Mini-SIEM/
+
+
+- VirusTotal Enrichment – Suspicious IPs are automatically checked against 90+ antivirus engines
+- Smart Whitelist – Ignores normal HTTPS/HTTP/DNS traffic to reduce false positives
