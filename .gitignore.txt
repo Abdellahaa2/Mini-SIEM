@@ -1,0 +1,5 @@
+config.ps1
+SOC_Alerts.txt
+SOC_Debug.log
+index.html
+dashboard.html
